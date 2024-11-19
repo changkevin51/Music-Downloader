@@ -5,29 +5,11 @@ import warnings
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
 from yt_dlp import YoutubeDL, DownloadError
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
+from seleniumbase import SB
 import subprocess
 
 # Suppress warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
-
-@st.cache_resource
-def get_driver():
-    """Cache the WebDriver instance to optimize repeated browser usage."""
-    options = Options()
-    options.add_argument("--headless=new")  # Ensure compatibility with recent versions
-    options.add_argument("--log-level=3")
-    options.add_argument("--disable-notifications")
-    options.add_argument("--disable-gpu")
-    options.add_argument("window-size=1920,1080")
-    options.add_experimental_option("excludeSwitches", ["enable-logging"])
-
-    # Path to installed Chromedriver 120
-    chromedriver_path = "/path/to/your/chromedriver"  # Replace with the actual path
-    return webdriver.Chrome(service=Service(chromedriver_path), options=options)
 
 class SpotifyMusicDownloader:
     def __init__(self):
@@ -56,25 +38,24 @@ class SpotifyMusicDownloader:
         st.info(f"🔗 Found Spotify URL: {song_input}")
         self.islinkVerified = True
 
-        browser = get_driver()  # Use the cached driver instance
-        browser.get(song_input)
-        time.sleep(2)
+        # Use SeleniumBase to interact with the web
+        with SB(uc=True, headless=True) as browser:  # Enable headless mode
+            browser.open(song_input)
+            time.sleep(2)
 
-        try:
-            trackName = browser.find_element(By.TAG_NAME, "h1").text
-        except Exception:
-            st.error("❌ Could not extract the track name. The page structure might have changed.")
-            browser.quit()
-            return
+            try:
+                trackName = browser.get_text("h1")
+            except Exception:
+                st.error("❌ Could not extract the track name. The page structure might have changed.")
+                return
 
-        st.info("🔎 Searching for the song on YouTube...")
-        browser.get(f"https://www.youtube.com/results?search_query={trackName}")
-        try:
-            trackLink = browser.find_element(By.XPATH, '//*[@id="dismissible"]/ytd-thumbnail/a').get_attribute("href")
-        except Exception:
-            st.error("❌ Could not find the track on YouTube. Please try a different song.")
-            browser.quit()
-            return
+            st.info("🔎 Searching for the song on YouTube...")
+            browser.open(f"https://www.youtube.com/results?search_query={trackName}")
+            try:
+                trackLink = browser.get_attribute('//*[@id="dismissible"]/ytd-thumbnail/a', "href")
+            except Exception:
+                st.error("❌ Could not find the track on YouTube. Please try a different song.")
+                return
 
         st.info("⬇️ Downloading...")
 
@@ -87,13 +68,11 @@ class SpotifyMusicDownloader:
                 ydl.download([trackLink])
         except DownloadError as e:
             st.error(f"❌ Download failed: {e}")
-            browser.quit()
             return
 
         matching_files = [file for file in os.listdir(downloads_dir) if trackName in file]
         if not matching_files:
             st.error("✔️ Download completed, but the file could not be found.")
-            browser.quit()
             return
 
         webm_path = os.path.join(downloads_dir, matching_files[0])
