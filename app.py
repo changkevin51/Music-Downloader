@@ -1,16 +1,15 @@
-import streamlit as st
-import os
-import time
-import warnings
-import spotipy
-from spotipy.oauth2 import SpotifyClientCredentials
-from yt_dlp import YoutubeDL, DownloadError
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
-import subprocess
-import shutil
+import os                       # For directory and file operations
+import time                     # To add delays (e.g., `time.sleep`)
+import shutil                   # To locate `chromedriver` dynamically
+import subprocess               # To execute shell commands (e.g., `ffmpeg` for conversion)
+import warnings                 # To suppress specific warnings
+import spotipy                  # For Spotify API integration
+from spotipy.oauth2 import SpotifyClientCredentials  # For Spotify authentication
+from yt_dlp import YoutubeDL, DownloadError          # For downloading YouTube videos
+from selenium import webdriver                      # For controlling the web browser
+from selenium.webdriver.common.by import By         # For locating elements on web pages
+from selenium.webdriver.chrome.service import Service  # To configure the Chrome WebDriver
+import streamlit as st          # For building the web application
 # Suppress warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
