@@ -10,7 +10,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 import subprocess
-
+service = Service(ChromeDriverManager().install())
 # Suppress warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
