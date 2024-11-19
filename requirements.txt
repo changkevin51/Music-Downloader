@@ -1,5 +1,5 @@
 streamlit
 spotipy
 yt-dlp
-seleniumbase 
+selenium
 colored

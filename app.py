@@ -5,12 +5,16 @@ import warnings
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
 from yt_dlp import YoutubeDL, DownloadError
-from seleniumbase import SB
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 import subprocess
-
+import shutil
 # Suppress warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
+# Define the SpotifyMusicDownloader class
 class SpotifyMusicDownloader:
     def __init__(self):
         self.islinkVerified = False
@@ -20,13 +24,40 @@ class SpotifyMusicDownloader:
         client_secret = st.secrets["client_secret"]
         # Configure Spotify API credentials
         self.sp = spotipy.Spotify(auth_manager=SpotifyClientCredentials(client_id, client_secret))
-
+        
         # Configure YT-DLP options
         self.ydl_opts = {
             "format": "bestaudio/best",
             "postprocessors": [],
             "outtmpl": "./downloads/%(title)s.%(ext)s",
         }
+
+        # Chrome options
+        self.browserProfile = webdriver.ChromeOptions()
+        self.browserProfile.add_argument("--headless=old")
+        self.browserProfile.add_argument("--log-level=3")
+        self.browserProfile.add_argument("--disable-notifications")
+        self.browserProfile.add_argument("--disable-gpu")
+        self.browserProfile.add_argument("window-size=1920,1080")
+        self.browserProfile.add_experimental_option("excludeSwitches", ["enable-logging"])
+
+    def searchAndRetrieveSpotifyLink(self, song_name):
+        results = self.sp.search(q=song_name, limit=1, type='track')
+        if results['tracks']['items']:
+            track = results['tracks']['items'][0]
+            return track['external_urls']['spotify']
+        else:
+            return None
+
+    def executeChrome(self):
+        # Locate chromedriver dynamically
+        chromedriver_path = shutil.which('chromedriver')
+        if not chromedriver_path:
+            st.error("❌ Chromedriver not found. Please install it and ensure it's in your PATH.")
+            return None
+        
+        service = Service(chromedriver_path)
+        self.browser = webdriver.Chrome(service=service, options=self.browserProfile)
 
     def soloDownloader(self, song_input):
         if "https://open.spotify.com/track" not in song_input:
@@ -38,24 +69,28 @@ class SpotifyMusicDownloader:
         st.info(f"🔗 Found Spotify URL: {song_input}")
         self.islinkVerified = True
 
-        # Use SeleniumBase to interact with the web
-        with SB(uc=True, headless=True) as browser:  # Enable headless mode
-            browser.open(song_input)
-            time.sleep(2)
+        self.executeChrome()
+        if not self.browser:  # Abort if chromedriver initialization failed
+            return
+        
+        self.browser.get(song_input)
+        time.sleep(2)
 
-            try:
-                trackName = browser.get_text("h1")
-            except Exception:
-                st.error("❌ Could not extract the track name. The page structure might have changed.")
-                return
+        try:
+            trackName = self.browser.find_element(By.TAG_NAME, "h1").text
+        except Exception:
+            st.error("❌ Could not extract the track name. The page structure might have changed.")
+            self.browser.quit()
+            return
 
-            st.info("🔎 Searching for the song on YouTube...")
-            browser.open(f"https://www.youtube.com/results?search_query={trackName}")
-            try:
-                trackLink = browser.get_attribute('//*[@id="dismissible"]/ytd-thumbnail/a', "href")
-            except Exception:
-                st.error("❌ Could not find the track on YouTube. Please try a different song.")
-                return
+        st.info("🔎 Searching for the song on YouTube...")
+        self.browser.get(f"https://www.youtube.com/results?search_query={trackName}")
+        try:
+            trackLink = self.browser.find_element(By.XPATH, '//*[@id="dismissible"]/ytd-thumbnail/a').get_attribute("href")
+        except Exception:
+            st.error("❌ Could not find the track on YouTube. Please try a different song.")
+            self.browser.quit()
+            return
 
         st.info("⬇️ Downloading...")
 
@@ -68,24 +103,18 @@ class SpotifyMusicDownloader:
                 ydl.download([trackLink])
         except DownloadError as e:
             st.error(f"❌ Download failed: {e}")
+            self.browser.quit()
             return
 
         matching_files = [file for file in os.listdir(downloads_dir) if trackName in file]
         if not matching_files:
             st.error("✔️ Download completed, but the file could not be found.")
+            self.browser.quit()
             return
 
         webm_path = os.path.join(downloads_dir, matching_files[0])
         mp3_path = os.path.splitext(webm_path)[0] + ".mp3"
         self.convert_to_mp3(webm_path, mp3_path)
-
-    def searchAndRetrieveSpotifyLink(self, song_name):
-        results = self.sp.search(q=song_name, limit=1, type='track')
-        if results['tracks']['items']:
-            track = results['tracks']['items'][0]
-            return track['external_urls']['spotify']
-        else:
-            return None
 
     def convert_to_mp3(self, webm_path, mp3_path):
         try:
@@ -107,6 +136,8 @@ class SpotifyMusicDownloader:
         except Exception as e:
             st.error(f"❌ An error occurred during conversion: {e}")
 
+
+# Streamlit app setup
 # Streamlit app setup
 st.set_page_config(page_title="Spotify Music Downloader", page_icon="🎵", layout="wide")
 st.sidebar.title("Options")
@@ -127,7 +158,15 @@ if option == "Download Song by Name/URL":
 st.header("")
 st.header("")
 
-# Footer
+# Add an image at the bottom of the page
+st.markdown("<hr style='border:1px solid #ddd;'>", unsafe_allow_html=True)  # Separator line
+st.markdown("<p style='text-align: center;'>Thank you for using Spotify Music Downloader!</p>", unsafe_allow_html=True)
+st.write("")
+st.image("music-note.png", caption="Enjoy your free music :D 🎵", use_container_width=True)
+
+for i in range(5):
+    st.write("")
+# CSS for footer styling
 footer_style = """
 <style>
 .footer {
@@ -140,6 +179,8 @@ footer_style = """
 </style>
 """
 
+# Add footer content
 st.markdown(footer_style, unsafe_allow_html=True)
 st.markdown('<div class="footer">This app uses Spotify Web API to search and find the song URL and yt-dlp library to download them.</div>', unsafe_allow_html=True)
+st.write("")
 st.markdown('<div class="footer">A project by Kevin Chang</div>', unsafe_allow_html=True)
