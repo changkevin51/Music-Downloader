@@ -20,8 +20,6 @@ class SpotifyMusicDownloader:
         self.islinkVerified = False
         self.YTDLAudioFormat = "webm"  # Download as WebM to ensure compatibility
         self.bitrate = "320"
-        client_id = st.secrets["client_id"]
-        client_secret = st.secrets["client_secret"]
         # Configure Spotify API credentials
         self.sp = spotipy.Spotify(auth_manager=SpotifyClientCredentials(client_id, client_secret))
         
