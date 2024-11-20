@@ -3,3 +3,4 @@ spotipy
 yt-dlp
 selenium
 colored
+webdriver_manager
